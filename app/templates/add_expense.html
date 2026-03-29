@@ -1,0 +1,94 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="max-w-lg mx-auto mt-6 anim-1">
+
+    <!-- Header -->
+    <div class="flex items-center gap-4 mb-8">
+        <a href="{{ url_for('main.index') }}" class="w-10 h-10 rounded-xl flex items-center justify-center transition hover:scale-110"
+           style="background:var(--card); border:1px solid var(--border);">←</a>
+        <div>
+            <h1 class="text-2xl font-black" style="color:var(--text)">
+                {{ "Edit Expense ✏️" if expense else "Add Expense 💸" }}
+            </h1>
+            <p class="text-xs text-faint">{{ "Update the details below" if expense else "Track where your money goes" }}</p>
+        </div>
+    </div>
+
+    <div class="card p-8">
+        <form method="POST" class="flex flex-col gap-5">
+
+            <!-- Title -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-widest mb-2 text-faint">What did you spend on?</label>
+                <input type="text" name="title" value="{{ expense.title if expense else '' }}"
+                       placeholder="e.g. Lunch, Uber, Groceries"
+                       class="input" autofocus required>
+            </div>
+
+            <!-- Amount -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-widest mb-2 text-faint">Amount (₹)</label>
+                <div class="relative">
+                    <span class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg" style="color:var(--accent)">₹</span>
+                    <input type="number" name="amount" step="0.01"
+                           value="{{ expense.amount if expense else '' }}"
+                           placeholder="0.00"
+                           class="input pl-9 text-xl font-black" required>
+                </div>
+            </div>
+
+            <!-- Category — visual pill selector -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-widest mb-3 text-faint">Category</label>
+                <div class="grid grid-cols-3 gap-3">
+                    {% for cat, icon, color in [('Need','🏠','blue'), ('Want','🎮','purple'), ('Savings','🐷','green')] %}
+                    <label class="cursor-pointer">
+                        <input type="radio" name="category" value="{{ cat }}" class="hidden peer"
+                               {% if (expense and expense.category == cat) or (not expense and cat == 'Need') %}checked{% endif %}>
+                        <div class="peer-checked:ring-2 peer-checked:ring-offset-1 rounded-2xl p-4 text-center transition hover:scale-105
+                            {% if color == 'blue' %}peer-checked:ring-blue-400{% elif color == 'purple' %}peer-checked:ring-purple-400{% else %}peer-checked:ring-green-400{% endif %}"
+                             style="background:var(--card2); border:1px solid var(--border);">
+                            <div class="text-2xl mb-1">{{ icon }}</div>
+                            <p class="text-xs font-black" style="color:var(--text)">{{ cat }}</p>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Date -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-widest mb-2 text-faint">Date <span class="normal-case font-normal">(leave blank for today)</span></label>
+                <input type="date" name="date"
+                       value="{{ expense.date_posted.strftime('%Y-%m-%d') if expense else default_date or '' }}"
+                       class="input">
+            </div>
+
+            <!-- Link to Trip/Event — always shown -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-widest mb-2 text-faint">Link to Trip/Event <span class="normal-case font-normal">(optional)</span></label>
+                <select name="event_id" class="input">
+                    <option value="None">None — Personal Expense</option>
+                    {% for event in events %}
+                    <option value="{{ event.id }}" {% if expense and expense.event_id == event.id %}selected{% endif %}>
+                        ✈️ {{ event.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if not events %}
+                <p class="text-xs text-faint mt-1">No trips yet. <a href="{{ url_for('main.new_event') }}" class="text-accent hover:underline">Create one →</a></p>
+                {% endif %}
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" class="btn btn-primary w-full justify-center py-3 text-base mt-2">
+                {{ "Update Expense ✏️" if expense else "Add Expense 💸" }}
+            </button>
+
+            {% if expense %}
+            <a href="{{ url_for('main.index') }}" class="text-center text-xs text-faint hover:text-accent transition">Cancel</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+{% endblock %}

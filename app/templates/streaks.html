@@ -1,0 +1,58 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="max-w-2xl mx-auto mt-10">
+    <div class="bg-white p-10 rounded-2xl shadow-xl border border-gray-100 text-center">
+        
+        {% if streak_count > 0 %}
+            <div class="relative inline-block mb-6">
+                <div class="text-8xl animate-bounce">🔥</div>
+                <div class="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-black px-3 py-1 rounded-full shadow-lg">
+                    HOT
+                </div>
+            </div>
+            
+            <h2 class="text-4xl font-black text-gray-800 mb-2">{{ streak_count }} Day Streak!</h2>
+            <p class="text-gray-500 mb-8">You're on fire, Anushka! Your financial discipline is paying off.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div class="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                    <p class="text-orange-800 font-bold text-sm uppercase">Current Level</p>
+                    <p class="text-2xl font-black text-orange-600">Budget Master</p>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <p class="text-blue-800 font-bold text-sm uppercase">Next Reward</p>
+                    <p class="text-2xl font-black text-blue-600">{{ 10 - (streak_count % 10) }} Days Left</p>
+                </div>
+            </div>
+
+        {% else %}
+            <div class="text-8xl mb-6 opacity-50 grayscale">🧊</div>
+            
+            <h2 class="text-3xl font-black text-gray-400 mb-2">Streak Cooled Down</h2>
+            <p class="text-gray-500 mb-8">It happens to the best of us! Don't let your progress slip away.</p>
+            
+            <div class="bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 mb-8">
+                <h3 class="text-blue-800 font-bold mb-2">⚡ Pro Tip for your B.Tech Project:</h3>
+                <p class="text-blue-600 text-sm mb-4">You can revive your streak by logging an expense for yesterday.</p>
+                <a href="{{ url_for('main.add_expense', save_streak='true') }}" 
+                   class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold shadow-lg transition transform hover:scale-105 inline-block">
+                    Save My Streak Now
+                </a>
+            </div>
+        {% endif %}
+
+        <hr class="my-8 border-gray-100">
+        
+        <div class="flex flex-col md:flex-row justify-center gap-4">
+            <a href="{{ url_for('main.index') }}" class="text-gray-500 hover:text-gray-800 font-bold text-sm transition">
+                ← Back to Dashboard
+            </a>
+            <a href="{{ url_for('main.history') }}" class="text-blue-600 hover:text-blue-800 font-bold text-sm transition">
+                View Full History →
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

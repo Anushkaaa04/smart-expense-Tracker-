@@ -1,0 +1,784 @@
+{% extends "layout.html" %}
+{% block content %}
+
+{% if is_daily %}
+<style>
+  /* Sky blue accent for daily mode — overrides all btn-primary and accent colors */
+  :root, [data-theme="bright"], [data-theme="space"], [data-theme="dark"] {
+    --accent:  #0ea5e9;
+    --accent2: #06b6d4;
+    --accent3: #38bdf8;
+  }
+</style>
+{% endif %}
+
+{% if request.args.get('set_budget') %}
+<!-- Set Budget Popup -->
+<div id="setBudgetPopup" class="fixed inset-0 z-50 flex items-center justify-center"
+     style="background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);">
+    <div class="card mx-4 p-8 text-center max-w-sm w-full"
+         style="animation:popIn 0.35s cubic-bezier(0.175,0.885,0.32,1.275);">
+        <div class="text-5xl mb-3">{% if request.args.get('set_budget') == 'daily' %}📅{% else %}💰{% endif %}</div>
+        <h2 class="text-xl font-black mb-2" style="color:var(--text)">
+            {% if request.args.get('set_budget') == 'daily' %}Set Your Daily Budget{% else %}Set Your Monthly Budget{% endif %}
+        </h2>
+        <p class="text-sm mb-6 text-faint">
+            {% if request.args.get('set_budget') == 'daily' %}
+                How much do you want to spend per day?
+            {% else %}
+                What's your budget for this month?
+            {% endif %}
+        </p>
+        <form action="{{ url_for('main.update_budget') }}" method="POST" class="flex flex-col gap-3">
+            <div class="relative">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg" style="color:var(--accent)">₹</span>
+                <input type="number" name="new_budget" step="0.01" placeholder="0.00" autofocus required
+                       class="input pl-9 text-2xl font-black text-center">
+            </div>
+            <button type="submit" class="btn btn-primary w-full justify-center py-3 text-base">
+                Set Budget 🚀
+            </button>
+        </form>
+        <button onclick="document.getElementById('setBudgetPopup').remove()"
+                class="mt-3 text-xs text-faint hover:text-accent transition bg-transparent border-none cursor-pointer">
+            Skip for now
+        </button>
+    </div>
+</div>
+{% endif %}
+
+{% if show_limit_popup %}
+<!-- Limit Exceeded Popup -->
+<div id="limitPopup" class="fixed inset-0 z-50 flex items-center justify-center"
+     style="background:rgba(0,0,0,0.6); backdrop-filter:blur(6px); animation:fadeIn 0.3s ease;">
+    <div class="relative mx-4 rounded-3xl p-8 text-center max-w-sm w-full"
+         style="background:var(--card); border:1px solid rgba(239,68,68,0.3); box-shadow:0 0 60px rgba(239,68,68,0.25); animation:popIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275);">
+
+        <!-- Pulsing red ring -->
+        <div class="absolute inset-0 rounded-3xl" style="border:2px solid rgba(239,68,68,0.4); animation:ringPulse 1.5s ease-in-out infinite;"></div>
+
+        <div class="text-6xl mb-3">🚨</div>
+        <h2 class="text-2xl font-black mb-2" style="color:var(--red)">
+            {% if is_daily %}Daily Limit Exceeded!{% else %}Budget Exceeded!{% endif %}
+        </h2>
+        <p class="text-sm mb-2" style="color:var(--text2)">
+            You've gone over your {% if is_daily %}daily{% else %}monthly{% endif %} budget by
+        </p>
+        <p class="text-4xl font-black mb-4" style="color:var(--red)">₹{{ "%.0f"|format(popup_overage) }}</p>
+        <p class="text-xs mb-6" style="color:var(--text3)">
+            {% if is_daily %}Try to cut back for the rest of today.{% else %}Reduce spending to stay on track.{% endif %}
+        </p>
+
+        <div class="flex flex-col gap-3">
+            <button onclick="dismissPopup()"
+                    class="btn btn-primary w-full justify-center py-3 text-base">
+                Got it, I'll be careful 💪
+            </button>
+            <button onclick="dismissPopup()"
+                    class="text-xs cursor-pointer" style="color:var(--text3); background:none; border:none;">
+                Dismiss
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes popIn { from{opacity:0;transform:scale(0.8);} to{opacity:1;transform:scale(1);} }
+@keyframes ringPulse { 0%,100%{opacity:0.4;transform:scale(1);} 50%{opacity:0.8;transform:scale(1.02);} }
+</style>
+<script>
+function dismissPopup() {
+    const popup = document.getElementById('limitPopup');
+    popup.style.animation = 'fadeOut 0.2s ease forwards';
+    setTimeout(() => popup.remove(), 200);
+    // Remember dismissal for this session so it doesn't re-show on every refresh
+    sessionStorage.setItem('limitPopupDismissed', '{{ popup_overage }}');
+}
+// Don't show again if already dismissed this session for same overage
+(function() {
+    const dismissed = sessionStorage.getItem('limitPopupDismissed');
+    if (dismissed === '{{ popup_overage }}') {
+        document.getElementById('limitPopup').remove();
+    }
+})();
+</script>
+{% endif %}
+
+<!-- Notifications -->
+{% if notifications %}
+<div class="mb-6 flex flex-col gap-3 anim-1">
+    {% for n in notifications %}
+    <div class="alert alert-{% if n.level == 'danger' %}danger{% elif n.level == 'warning' %}warning{% else %}warning{% endif %} flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <span class="text-xl">{{ n.icon }}</span>
+            <span class="text-sm font-semibold">{{ n.msg }}</span>
+        </div>
+        <button onclick="this.parentElement.remove()" class="opacity-40 hover:opacity-100 transition font-bold text-lg leading-none ml-4">✕</button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Active Trip Banner -->
+{% if active_trip %}
+{% set at = active_trip %}
+{% set at_budget = at.total_budget|float %}
+{% set at_spent = at.expenses|selectattr('amount','gt',0)|sum(attribute='amount') %}
+{% set at_pct = [[((at_spent / at_budget) * 100), 100]|min, 0]|max if at_budget > 0 else 0 %}
+<a href="{{ url_for('main.trip_detail', event_id=at.id) }}"
+   class="flex items-center gap-4 rounded-2xl p-4 mb-6 anim-1 no-underline group"
+   style="background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.1));border:1px solid rgba(99,102,241,0.25);text-decoration:none;">
+    <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+         style="background:rgba(99,102,241,0.2);">✈️</div>
+    <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-black uppercase tracking-widest" style="color:var(--accent)">Active Trip</span>
+            <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+        </div>
+        <p class="font-black text-sm" style="color:var(--text)">{{ at.name }}</p>
+        <div class="progress-track h-1.5 mt-2" style="max-width:200px;">
+            <div class="progress-fill h-1.5" style="width:{{ at_pct }}%;background:linear-gradient(90deg,var(--accent),var(--accent2));"></div>
+        </div>
+    </div>
+    <div class="text-right flex-shrink-0">
+        <p class="text-xs text-faint">Remaining</p>
+        <p class="font-black" style="color:var(--green)">₹{{ "%.0f"|format(at_budget - at_spent) }}</p>
+    </div>
+    <span class="text-faint group-hover:text-accent transition">→</span>
+</a>
+{% endif %}
+
+<!-- Hero Banner -->
+<div class="rounded-3xl p-8 mb-8 anim-1 relative overflow-hidden"
+     style="background: {% if is_daily %}linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #06b6d4 100%){% else %}linear-gradient(135deg, var(--accent) 0%, var(--accent2) 60%, var(--accent3) 100%){% endif %}; box-shadow: var(--shadow-lg);">
+    <div class="absolute inset-0 opacity-10" style="background: radial-gradient(circle at 80% 50%, white 0%, transparent 60%);"></div>
+    <div class="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div>
+            <p class="text-white/70 text-sm font-semibold uppercase tracking-widest mb-1">Welcome back 👋</p>
+            <h1 class="text-3xl font-black text-white mb-3">{{ current_user.username }}</h1>
+            <div class="flex flex-wrap items-center gap-3">
+                <a href="{{ url_for('main.streaks') }}"
+                   class="flex items-center gap-2 bg-white/15 hover:bg-white/25 transition px-4 py-2 rounded-xl border border-white/20 no-underline">
+                    <span class="text-xl">🔥</span>
+                    <span class="text-white font-black text-lg">{{ streak_count }}</span>
+                    <span class="text-white/70 text-xs font-medium">day streak</span>
+                </a>
+                {% if current_user.income_type == 'daily' %}
+                    <span class="bg-white/15 text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-white/20">🎒 Pocket Money</span>
+                    <form action="{{ url_for('main.switch_income_type') }}" method="POST" class="inline">
+                        <button type="submit" class="text-white/70 hover:text-white text-xs transition bg-transparent border-none cursor-pointer">Switch to Monthly →</button>
+                    </form>
+                {% elif current_user.income_type == 'monthly' %}
+                    <span class="bg-white/15 text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-white/20">💼 Monthly Income</span>
+                    <form action="{{ url_for('main.switch_income_type') }}" method="POST" class="inline">
+                        <button type="submit" class="text-white/70 hover:text-white text-xs transition bg-transparent border-none cursor-pointer">Switch to Daily →</button>
+                    </form>
+                {% else %}
+                    <a href="{{ url_for('main.onboarding') }}" class="text-white/70 hover:text-white text-xs transition">Set income type →</a>
+                {% endif %}
+            </div>
+        </div>
+        <form action="{{ url_for('main.update_budget') }}" method="POST" class="flex gap-2 w-full md:w-auto">
+            <input type="number" name="new_budget" step="0.01"
+                   placeholder="{% if is_daily %}Set daily budget...{% else %}Set monthly budget...{% endif %}"
+                   class="flex-1 md:w-52 px-4 py-2.5 rounded-xl bg-white/15 border border-white/25 text-white placeholder-white/50 outline-none focus:bg-white/25 transition text-sm font-medium" required>
+            <button type="submit" class="px-5 py-2.5 bg-white text-indigo-700 font-black rounded-xl hover:bg-white/90 transition shadow-lg whitespace-nowrap text-sm">
+                {% if is_daily %}Set Daily{% else %}Update{% endif %}
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="card stat-card-blue p-5 anim-2">
+        <div class="flex items-center justify-between mb-4">
+            <span class="text-xs font-bold uppercase tracking-widest text-faint stat-label">{{ budget_label }}</span>
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base"
+                 style="background:rgba(99,102,241,0.12);">{% if is_daily %}📅{% else %}💰{% endif %}</div>
+        </div>
+        <button id="budgetBtn" onclick="toggleBudgetHistory(event)"
+                class="text-left w-full" style="background:none;border:none;cursor:pointer;padding:0;">
+            <p class="text-2xl font-black num-value transition hover:opacity-75" style="color:var(--accent)">₹{{ "%.0f"|format(budget) }}</p>
+            <p class="text-xs mt-1 flex items-center gap-1" style="color:var(--text3)">
+                {% if is_daily %}Per day{% else %}This month{% endif %} <span style="color:var(--accent);font-size:10px;">▾ history</span>
+            </p>
+        </button>
+    </div>
+
+    <div class="card stat-card-red p-5 anim-2">
+        <div class="flex items-center justify-between mb-4">
+            <span class="text-xs font-bold uppercase tracking-widest text-faint stat-label">Spent</span>
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base"
+                 style="background:rgba(239,68,68,0.12);">💸</div>
+        </div>
+        <button id="spentBtn" onclick="togglePanel(event,'spentPanel','spentBtn')"
+                class="text-left w-full" style="background:none;border:none;cursor:pointer;padding:0;">
+            <p class="text-2xl font-black num-value transition hover:opacity-75" style="color:var(--red)">₹{{ "%.0f"|format(total_spent) }}</p>
+            <p class="text-xs mt-1 flex items-center gap-1" style="color:var(--text3)">
+                {{ spent_label }} <span style="color:var(--red);font-size:10px;">▾ history</span>
+            </p>
+        </button>
+    </div>
+
+    <div class="card stat-card-green p-5 anim-3">
+        <div class="flex items-center justify-between mb-4">
+            <span class="text-xs font-bold uppercase tracking-widest text-faint stat-label">Savings</span>
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base"
+                 style="background:rgba(16,185,129,0.12);">🐷</div>
+        </div>
+        <button id="savingsBtn" onclick="togglePanel(event,'savingsPanel','savingsBtn')"
+                class="text-left w-full" style="background:none;border:none;cursor:pointer;padding:0;">
+            <p class="text-2xl font-black num-value transition hover:opacity-75" style="color:var(--green)">₹{{ "%.0f"|format(chart_data[2]) }}</p>
+            <p class="text-xs mt-1 flex items-center gap-1" style="color:var(--text3)">
+                Saved this month <span style="color:var(--green);font-size:10px;">▾ history</span>
+            </p>
+        </button>
+    </div>
+
+    <div class="card p-5 anim-3" style="border-top: 3px solid var(--{% if health_color == 'red' %}red{% elif health_color == 'yellow' %}orange{% else %}green{% endif %});">
+        <div class="flex items-center justify-between mb-4">
+            <span class="text-xs font-bold uppercase tracking-widest text-faint">AI Insight</span>
+            <span class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full ai-pulse"
+                      style="background:var(--{% if health_color == 'red' %}red{% elif health_color == 'yellow' %}orange{% else %}green{% endif %})"></span>
+                <span class="text-[10px] font-black"
+                      style="color:var(--{% if health_color == 'red' %}red{% elif health_color == 'yellow' %}orange{% else %}green{% endif %})">LIVE</span>
+            </span>
+        </div>
+        <p class="text-xs font-semibold text-muted leading-relaxed">{{ advice }}</p>
+    </div>
+</div>
+
+<!-- Budget Progress -->
+<div class="card p-6 mb-8 anim-3">
+    <div class="flex justify-between items-center mb-3">
+        <span class="text-sm font-bold text-muted">{% if is_daily %}Today's Spending Progress{% else %}Monthly Spending Progress{% endif %}</span>
+        <span class="text-sm font-black"
+              style="color:{% if budget == 0 and total_spent > 0 %}var(--red){% elif progress_pct >= 100 %}var(--red){% else %}var(--accent){% endif %}">
+            {% if budget == 0 and total_spent > 0 %}No budget set{% else %}{{ progress_pct|round|int }}%{% endif %}
+        </span>
+    </div>
+    <div class="progress-track h-3">
+        {% set display_pct = 100 if (budget == 0 and total_spent > 0) else progress_pct %}
+        <div class="progress-fill h-3"
+             style="width:{{ display_pct }}%;
+             background: linear-gradient(90deg,
+             {% if budget == 0 and total_spent > 0 %}var(--red),#f43f5e
+             {% elif display_pct >= 100 %}var(--red),#f43f5e
+             {% elif display_pct >= 80 %}var(--orange),#f59e0b
+             {% else %}var(--accent),var(--accent2){% endif %});">
+        </div>
+    </div>
+    <div class="flex justify-between mt-2">
+        <span class="text-xs text-faint">₹0 spent</span>
+        {% if budget == 0 %}
+        <span class="text-xs" style="color:var(--red)">⚠️ Set a budget to track progress</span>
+        {% else %}
+        <span class="text-xs text-faint">₹{{ "%.0f"|format(budget) }} {% if is_daily %}/day{% endif %}</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Feature Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 anim-4">
+    <a href="{{ url_for('main.savings_dashboard') }}"
+       class="card card-lift p-5 flex items-center gap-4 no-underline group" style="text-decoration:none;">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 transition group-hover:scale-110"
+             style="background:rgba(236,72,153,0.12); border:1px solid rgba(236,72,153,0.2);">🐷</div>
+        <div class="flex-1 min-w-0">
+            <p class="font-bold text-sm" style="color:var(--text)">Savings Bank</p>
+            <p class="text-xs font-bold" style="color:var(--green)">₹{{ "%.0f"|format(chart_data[2]) }} saved</p>
+        </div>
+        <span class="text-faint group-hover:text-accent transition text-lg">→</span>
+    </a>
+
+    <div class="card p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
+             style="background:rgba(6,182,212,0.12); border:1px solid rgba(6,182,212,0.2);">✈️</div>
+        <div class="flex-1 min-w-0">
+            <p class="font-bold text-sm" style="color:var(--text)">Trip Mode</p>
+            <p class="text-xs text-faint">Group event budgets</p>
+        </div>
+        <div class="flex flex-col gap-1 items-end">
+            <a href="{{ url_for('main.new_event') }}" class="btn btn-ghost text-xs px-3 py-1.5" style="font-size:11px;">+ New</a>
+            <a href="{{ url_for('main.list_events') }}" class="text-xs text-faint hover:text-accent transition" style="text-decoration:none;">View →</a>
+        </div>
+    </div>
+
+    <a href="{{ url_for('main.wishlist') }}" class="card card-lift p-5 flex items-center gap-4 no-underline group" style="text-decoration:none; border-color:rgba(139,92,246,0.2);">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 transition group-hover:scale-110"
+             style="background:rgba(139,92,246,0.12); border:1px solid rgba(139,92,246,0.2);">✨</div>
+        <div class="flex-1 min-w-0">
+            <p class="font-bold text-sm" style="color:var(--text)">Wishlist</p>
+            <p class="text-xs text-faint">Track saving goals</p>
+        </div>
+        <span class="text-faint group-hover:text-accent transition text-lg">→</span>
+    </a>
+</div>
+
+<!-- Gift Money + Quick Add -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 anim-4">
+    <div class="card p-6">
+        <div class="flex items-center gap-3 mb-5">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                 style="background:rgba(236,72,153,0.12); border:1px solid rgba(236,72,153,0.2);">🎁</div>
+            <div>
+                <h3 class="font-bold text-sm" style="color:var(--text)">Received Gift Money?</h3>
+                <p class="text-xs text-faint">Goes straight to your savings bank</p>
+            </div>
+        </div>
+        <form action="{{ url_for('main.gift_money') }}" method="POST" class="flex flex-col gap-3">
+            <input type="text" name="description" placeholder="e.g. Birthday gift from Dad" class="input">
+            <div class="flex gap-3">
+                <input type="number" name="amount" step="0.01" placeholder="Amount (₹)" required class="input flex-1">
+                <button type="submit" class="btn whitespace-nowrap"
+                        style="background:linear-gradient(135deg,#ec4899,#f43f5e);color:white;box-shadow:0 4px 16px rgba(236,72,153,0.3);">
+                    Add 🐷
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card p-6">
+        <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                     style="background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.2);">⚡</div>
+                <div>
+                    <h3 class="font-bold text-sm" style="color:var(--text)">Quick Add</h3>
+                    <p class="text-xs text-faint">One-click daily expenses</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('qaForm').classList.toggle('hidden')"
+                    class="btn btn-ghost text-xs px-3 py-1.5">+ Template</button>
+        </div>
+
+        <div id="qaForm" class="hidden mb-4 p-4 rounded-xl" style="background:var(--card2); border:1px solid var(--border);">
+            <form action="{{ url_for('main.quick_add') }}" method="POST" class="flex flex-wrap gap-2 items-end">
+                <input type="text" name="title" placeholder="Coffee" required class="input flex-1 min-w-[90px]">
+                <input type="number" name="amount" step="0.01" placeholder="₹" required class="input w-20">
+                <select name="category" class="input w-28">
+                    <option value="Need">Need</option>
+                    <option value="Want">Want</option>
+                    <option value="Savings">Savings</option>
+                </select>
+                <button type="submit" class="btn btn-primary text-xs px-4 py-2">Save</button>
+            </form>
+        </div>
+
+        {% if quick_expenses %}
+        <div class="flex flex-wrap gap-2">
+            {% for qe in quick_expenses %}
+            <div class="flex items-center gap-1 rounded-xl px-1 py-1" style="background:var(--card2); border:1px solid var(--border);">
+                <form action="{{ url_for('main.log_quick_expense', qe_id=qe.id) }}" method="POST">
+                    <button type="submit" class="badge px-3 py-1.5 text-xs font-bold cursor-pointer transition hover:opacity-80
+                        {% if qe.category == 'Need' %}badge-blue{% elif qe.category == 'Want' %}badge-purple{% else %}badge-green{% endif %}">
+                        {{ qe.title }} · ₹{{ "%.0f"|format(qe.amount) }}
+                    </button>
+                </form>
+                <form action="{{ url_for('main.delete_quick_expense', qe_id=qe.id) }}" method="POST">
+                    <button type="submit" class="text-xs px-1.5 transition text-faint hover:text-red-400 bg-transparent border-none cursor-pointer">✕</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-xs text-faint italic">No templates yet. Add one above.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Transactions -->
+<div class="card overflow-hidden mb-8 anim-5">
+    <div class="p-6 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between" style="border-bottom:1px solid var(--border);">
+        <h2 class="font-black text-lg flex items-center gap-2" style="color:var(--text)">💸 Recent Expenses</h2>
+        <form action="{{ url_for('main.index') }}" method="GET" class="flex flex-wrap gap-2 items-center">
+            <input type="text" name="search" placeholder="Search..." value="{{ request.args.get('search', '') }}" class="input" style="width:160px;">
+            <select name="category" class="input" style="width:150px;">
+                <option value="All">All Categories</option>
+                <option value="Need" {% if request.args.get('category') == 'Need' %}selected{% endif %}>Need</option>
+                <option value="Want" {% if request.args.get('category') == 'Want' %}selected{% endif %}>Want</option>
+                <option value="Savings" {% if request.args.get('category') == 'Savings' %}selected{% endif %}>Savings</option>
+                <option value="Picnic" {% if request.args.get('category') == 'Picnic' %}selected{% endif %}>Picnic</option>
+            </select>
+            <button type="submit" class="btn btn-primary text-sm px-4 py-2">Filter</button>
+        </form>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr style="border-bottom:1px solid var(--border);">
+                    <th class="py-3 px-6 text-left text-xs font-bold uppercase tracking-widest text-faint">Date</th>
+                    <th class="py-3 px-6 text-left text-xs font-bold uppercase tracking-widest text-faint">Item</th>
+                    <th class="py-3 px-6 text-left text-xs font-bold uppercase tracking-widest text-faint">Category</th>
+                    <th class="py-3 px-6 text-right text-xs font-bold uppercase tracking-widest text-faint">Amount</th>
+                    <th class="py-3 px-6 text-center text-xs font-bold uppercase tracking-widest text-faint">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for expense in expenses %}
+                {% if expense.id in high_expense_ids %}
+                    {% set rc = 'red' %}
+                {% elif expense.id in medium_expense_ids %}
+                    {% set rc = 'orange' %}
+                {% else %}
+                    {% set rc = 'normal' %}
+                {% endif %}
+                <tr class="trow" style="border-bottom:1px solid var(--border);
+                    {% if expense.id in over_budget_ids %}background:rgba(239,68,68,0.05);{% endif %}">
+                    <td class="py-4 px-6 text-sm font-medium"
+                        style="color:{% if rc == 'red' %}var(--red){% elif rc == 'orange' %}var(--orange){% else %}var(--text2){% endif %}">
+                        {{ expense.date_posted.strftime('%d %b') }}
+                    </td>
+                    <td class="py-4 px-6 font-semibold"
+                        style="color:{% if rc == 'red' %}var(--red){% elif rc == 'orange' %}var(--orange){% else %}var(--text){% endif %}">
+                        {{ expense.title }}
+                        {% if expense.id in over_budget_ids %}
+                        <span class="badge badge-red ml-2">{% if is_daily %}Over Daily Limit{% else %}Over Budget{% endif %}</span>
+                        {% endif %}
+                    </td>
+                    <td class="py-4 px-6">
+                        <span class="badge {% if expense.category == 'Need' %}badge-blue{% elif expense.category == 'Want' %}badge-purple{% elif expense.category == 'Picnic' %}badge-picnic{% else %}badge-green{% endif %}">
+                            {{ expense.category }}
+                        </span>
+                    </td>
+                    <td class="py-4 px-6 text-right font-black text-base"
+                        style="color:{% if rc == 'red' %}var(--red){% elif rc == 'orange' %}var(--orange){% else %}var(--text){% endif %}">
+                        ₹{{ "%.2f"|format(expense.amount) }}
+                    </td>
+                    <td class="py-4 px-6 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                            <a href="{{ url_for('main.edit_expense', expense_id=expense.id) }}"
+                               class="w-8 h-8 rounded-lg flex items-center justify-center transition text-sm hover:scale-110"
+                               style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2);">✏️</a>
+                            <form action="{{ url_for('main.delete_expense', expense_id=expense.id) }}" method="POST">
+                                <button type="submit"
+                                        class="w-8 h-8 rounded-lg flex items-center justify-center transition text-sm hover:scale-110 cursor-pointer"
+                                        style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.2);">🗑️</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not expenses %}
+                <tr><td colspan="5" class="py-16 text-center text-faint text-sm">No expenses this month yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Chart -->
+<div class="card p-8 anim-5">
+    <h2 class="font-black text-lg mb-8 flex items-center gap-2" style="color:var(--text)">📊 Spending Breakdown</h2>
+    <div class="flex flex-col md:flex-row items-center justify-around gap-10">
+        <div style="width:100%; max-width:220px;"><canvas id="expenditureChart"></canvas></div>
+        <div class="flex flex-col gap-3 w-full md:w-auto">
+            <div class="flex items-center justify-between gap-10 p-4 rounded-2xl" style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.15);">
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-3 rounded-full" style="background:var(--accent)"></div>
+                    <span class="text-sm font-bold text-muted uppercase tracking-wider">Needs</span>
+                </div>
+                <span class="text-lg font-black" style="color:var(--accent)">₹{{ "%.0f"|format(chart_data[0]) }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-10 p-4 rounded-2xl" style="background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.15);">
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-3 rounded-full" style="background:var(--accent2)"></div>
+                    <span class="text-sm font-bold text-muted uppercase tracking-wider">Wants</span>
+                </div>
+                <span class="text-lg font-black" style="color:var(--accent2)">₹{{ "%.0f"|format(chart_data[1]) }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-10 p-4 rounded-2xl" style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.15);">
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-3 rounded-full" style="background:var(--green)"></div>
+                    <span class="text-sm font-bold text-muted uppercase tracking-wider">Savings</span>
+                </div>
+                <span class="text-lg font-black" style="color:var(--green)">₹{{ "%.0f"|format(chart_data[2]) }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Budget History Portal -->
+<div id="budgetHistory" class="hidden" style="position:fixed;z-index:9999;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow-lg);border-radius:16px;min-width:310px;max-height:360px;overflow-y:auto;">
+    <div class="px-4 py-3 sticky top-0" style="border-bottom:1px solid var(--border);background:var(--card);">
+        <p class="text-xs font-black uppercase tracking-widest" style="color:var(--text2)">💰 Budget History</p>
+    </div>
+    {% if monthly_history %}
+    {% for m in monthly_history %}
+    <div class="px-4 py-3" style="border-bottom:1px solid var(--border);">
+        <div class="flex items-center justify-between mb-1.5">
+            <span class="text-sm font-bold" style="color:var(--text)">{{ m.label }}</span>
+            {% if m.budget %}
+            <span class="text-xs font-black" style="color:var(--accent)">Budget ₹{{ "%.0f"|format(m.budget) }}</span>
+            {% endif %}
+        </div>
+        <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold" style="color:var(--red)">Spent ₹{{ "%.0f"|format(m.spent) }}</span>
+            <span class="text-xs font-semibold" style="color:var(--green)">Saved ₹{{ "%.0f"|format(m.saved) }}</span>
+            {% if m.budget %}
+            <span class="text-xs font-semibold" style="color:{% if m.spent > m.budget %}var(--red){% else %}var(--green){% endif %}">
+                {% if m.spent > m.budget %}Over by ₹{{ "%.0f"|format(m.spent - m.budget) }}{% else %}Under by ₹{{ "%.0f"|format(m.budget - m.spent) }}{% endif %}
+            </span>
+            {% endif %}
+        </div>
+        {% if m.budget %}
+        <div class="mt-2 h-1.5 rounded-full overflow-hidden" style="background:var(--card2);">
+            <div class="h-full rounded-full" style="width:{{ [((m.spent/m.budget)*100),100]|min }}%;background:{% if m.spent > m.budget %}var(--red){% else %}var(--accent){% endif %};"></div>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="px-4 py-6 text-center"><p class="text-xs" style="color:var(--text3)">No history yet. Set a budget to start tracking!</p></div>
+    {% endif %}
+</div>
+
+<!-- Spent History Portal -->
+<div id="spentPanel" class="hidden" style="position:fixed;z-index:9999;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow-lg);border-radius:16px;min-width:290px;max-height:320px;overflow-y:auto;">
+    <div class="px-4 py-3 sticky top-0" style="border-bottom:1px solid var(--border);background:var(--card);">
+        <p class="text-xs font-black uppercase tracking-widest" style="color:var(--text2)">💸 Monthly Spending</p>
+    </div>
+    {% if monthly_history %}
+    {% for m in monthly_history %}
+    <div class="px-4 py-3 flex items-center justify-between gap-6" style="border-bottom:1px solid var(--border);">
+        <span class="text-sm font-semibold" style="color:var(--text)">{{ m.label }}</span>
+        <span class="text-sm font-black" style="color:var(--red)">₹{{ "%.0f"|format(m.spent) }}</span>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="px-4 py-6 text-center"><p class="text-xs" style="color:var(--text3)">No spending history yet.</p></div>
+    {% endif %}
+</div>
+
+<!-- Savings History Portal -->
+<div id="savingsPanel" class="hidden" style="position:fixed;z-index:9999;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow-lg);border-radius:16px;min-width:290px;max-height:320px;overflow-y:auto;">
+    <div class="px-4 py-3 sticky top-0" style="border-bottom:1px solid var(--border);background:var(--card);">
+        <p class="text-xs font-black uppercase tracking-widest" style="color:var(--text2)">🐷 Monthly Savings</p>
+    </div>
+    {% if monthly_history %}
+    {% for m in monthly_history %}
+    <div class="px-4 py-3 flex items-center justify-between gap-6" style="border-bottom:1px solid var(--border);">
+        <span class="text-sm font-semibold" style="color:var(--text)">{{ m.label }}</span>
+        <span class="text-sm font-black" style="color:var(--green)">₹{{ "%.0f"|format(m.saved) }}</span>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="px-4 py-6 text-center"><p class="text-xs" style="color:var(--text3)">No savings history yet.</p></div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const _openPanel = { id: null };
+
+function togglePanel(e, panelId, btnId) {
+    e.stopPropagation();
+    const btn   = document.getElementById(btnId);
+    const panel = document.getElementById(panelId);
+    // close any other open panel
+    if (_openPanel.id && _openPanel.id !== panelId) {
+        document.getElementById(_openPanel.id).classList.add('hidden');
+    }
+    if (panel.classList.contains('hidden')) {
+        const rect = btn.getBoundingClientRect();
+        const panelW = 290;
+        let left = rect.left;
+        if (left + panelW > window.innerWidth - 12) left = window.innerWidth - panelW - 12;
+        panel.style.top  = (rect.bottom + 8) + 'px';
+        panel.style.left = Math.max(12, left) + 'px';
+        panel.classList.remove('hidden');
+        _openPanel.id = panelId;
+    } else {
+        panel.classList.add('hidden');
+        _openPanel.id = null;
+    }
+}
+
+function toggleBudgetHistory(e) { togglePanel(e, 'budgetHistory', 'budgetBtn'); }
+
+document.addEventListener('click', function() {
+    ['budgetHistory','spentPanel','savingsPanel'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+    _openPanel.id = null;
+});
+
+const style = getComputedStyle(document.documentElement);
+const accent  = style.getPropertyValue('--accent').trim();
+const accent2 = style.getPropertyValue('--accent2').trim();
+const green   = style.getPropertyValue('--green').trim();
+
+const ctx = document.getElementById('expenditureChart').getContext('2d');
+new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Needs', 'Wants', 'Savings'],
+        datasets: [{
+            data: {{ chart_data | tojson }},
+            backgroundColor: [
+                'rgba(99,102,241,0.75)',
+                'rgba(168,85,247,0.75)',
+                'rgba(16,185,129,0.75)'
+            ],
+            borderColor: 'transparent',
+            borderWidth: 0,
+            hoverOffset: 10
+        }]
+    },
+    options: {
+        responsive: true, cutout: '68%',
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(0,0,0,0.75)',
+                titleColor: '#fff', bodyColor: '#94a3b8',
+                padding: 12, cornerRadius: 12,
+                borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1
+            }
+        },
+        animation: { animateRotate: true, duration: 900, easing: 'easeInOutQuart' }
+    }
+});
+</script>
+
+<!-- Floating Add Button — opens modal -->
+<button onclick="openAddModal()"
+   class="fixed bottom-8 right-8 z-40 flex items-center gap-2 font-black text-white px-6 py-4 rounded-2xl shadow-2xl transition-all hover:scale-105 hover:-translate-y-1"
+   style="background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 8px 32px rgba(99,102,241,0.45);">
+    <span class="text-2xl leading-none">+</span> Add Expense
+</button>
+
+<!-- ── ADD EXPENSE MODAL ── -->
+<div id="addModal" class="fixed inset-0 z-50 hidden" aria-modal="true">
+    <!-- Backdrop -->
+    <div onclick="closeAddModal()" class="absolute inset-0" style="background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);"></div>
+
+    <!-- Panel — slides in from right -->
+    <div id="addModalPanel"
+         class="absolute right-0 top-0 h-full w-full max-w-md flex flex-col"
+         style="background:var(--bg2); transform:translateX(100%); transition:transform 0.35s cubic-bezier(0.4,0,0.2,1); box-shadow:-8px 0 40px rgba(0,0,0,0.3);">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-5" style="border-bottom:1px solid var(--border);">
+            <div>
+                <h2 class="text-xl font-black" style="color:var(--text)">Add Expense 💸</h2>
+                <p class="text-xs text-faint">Track where your money goes</p>
+            </div>
+            <button onclick="closeAddModal()" class="w-9 h-9 rounded-xl flex items-center justify-center text-lg transition hover:scale-110"
+                    style="background:var(--card2);border:1px solid var(--border);color:var(--text2);">✕</button>
+        </div>
+
+        <!-- Form -->
+        <div class="flex-1 overflow-y-auto px-6 py-6">
+            <form action="{{ url_for('main.add_expense') }}" method="POST" class="flex flex-col gap-6" id="addExpenseForm">
+
+                <!-- Amount — hero input -->
+                <div class="rounded-2xl p-5 text-center" style="background:var(--card);border:1px solid var(--border);">
+                    <p class="text-xs font-bold uppercase tracking-widest text-faint mb-3">Amount</p>
+                    <div class="flex items-center justify-center gap-2">
+                        <span class="text-3xl font-black" style="color:var(--accent)">₹</span>
+                        <input type="number" name="amount" step="0.01" placeholder="0"
+                               id="modalAmount"
+                               class="text-5xl font-black text-center bg-transparent outline-none w-48"
+                               style="color:var(--text);border:none;" required autofocus>
+                    </div>
+                </div>
+
+                <!-- Title -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-widest mb-2 text-faint">What for?</label>
+                    <input type="text" name="title" placeholder="Lunch, Uber, Coffee..."
+                           class="input" required>
+                </div>
+
+                <!-- Category pills -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-widest mb-3 text-faint">Category</label>
+                    <div class="grid grid-cols-3 gap-3">
+                        {% for cat, icon, clr in [('Need','🏠','indigo'),('Want','🎮','purple'),('Savings','🐷','emerald')] %}
+                        <label class="cursor-pointer">
+                            <input type="radio" name="category" value="{{ cat }}" class="hidden peer" {% if cat == 'Need' %}checked{% endif %}>
+                            <div class="rounded-2xl p-4 text-center transition-all duration-200 hover:scale-105 peer-checked:scale-105"
+                                 style="background:var(--card2); border:2px solid var(--border);"
+                                 id="cat-{{ cat }}"
+                                 onclick="highlightCat('{{ cat }}')">
+                                <div class="text-2xl mb-1">{{ icon }}</div>
+                                <p class="text-xs font-black" style="color:var(--text)">{{ cat }}</p>
+                            </div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Date -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-widest mb-2 text-faint">Date <span class="normal-case font-normal">(blank = today)</span></label>
+                    <input type="date" name="date" class="input">
+                </div>
+
+                <!-- Link to Trip/Event -->
+                {% if events %}
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-widest mb-2 text-faint">Link to Trip/Event <span class="normal-case font-normal">(optional)</span></label>
+                    <select name="event_id" class="input">
+                        <option value="None">None — Personal Expense</option>
+                        {% for event in events %}
+                        <option value="{{ event.id }}">✈️ {{ event.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <!-- Submit -->
+                <button type="submit" class="btn btn-primary w-full justify-center py-4 text-base font-black">
+                    Save Expense 💸
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openAddModal() {
+    const modal = document.getElementById('addModal');
+    const panel = document.getElementById('addModalPanel');
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        panel.style.transform = 'translateX(0)';
+    });
+    setTimeout(() => document.getElementById('modalAmount').focus(), 350);
+}
+
+function closeAddModal() {
+    const panel = document.getElementById('addModalPanel');
+    panel.style.transform = 'translateX(100%)';
+    setTimeout(() => document.getElementById('addModal').classList.add('hidden'), 350);
+}
+
+// Close on Escape key
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAddModal();
+});
+
+// Highlight selected category card
+function highlightCat(selected) {
+    ['Need','Want','Savings'].forEach(cat => {
+        const el = document.getElementById('cat-' + cat);
+        if (!el) return;
+        if (cat === selected) {
+            el.style.borderColor = 'var(--accent)';
+            el.style.background = 'rgba(99,102,241,0.1)';
+        } else {
+            el.style.borderColor = 'var(--border)';
+            el.style.background = 'var(--card2)';
+        }
+    });
+}
+// Init highlight
+highlightCat('Need');
+</script>
+
+{% endblock %}

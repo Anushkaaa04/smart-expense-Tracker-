@@ -1,0 +1,125 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="flex items-center gap-4 mb-8 anim-1">
+    <a href="{{ url_for('main.list_events') }}" class="w-10 h-10 rounded-xl flex items-center justify-center transition hover:scale-110"
+       style="background:var(--card); border:1px solid var(--border);">←</a>
+    <div class="flex-1">
+        <div class="flex items-center gap-3">
+            <h1 class="text-2xl font-black" style="color:var(--text)">
+                {% if event.trip_type == 'group' %}👥{% else %}🧍{% endif %} {{ event.name }}
+            </h1>
+            {% if event.is_active %}
+            <span class="badge badge-green">🟢 Active</span>
+            {% endif %}
+        </div>
+        <p class="text-xs text-faint">Trip budget tracker</p>
+    </div>
+    {% if event.is_active %}
+    <form action="{{ url_for('main.end_trip', event_id=event.id) }}" method="POST">
+        <button type="submit" class="btn btn-ghost text-sm">🏁 End Trip</button>
+    </form>
+    {% endif %}
+</div>
+
+<!-- Budget Overview -->
+<div class="grid grid-cols-3 gap-4 mb-8 anim-2">
+    <div class="card p-5 stat-card stat-card-blue">
+        <p class="text-xs text-faint stat-label uppercase tracking-widest mb-2">Trip Budget</p>
+        <p class="text-2xl font-black" style="color:var(--accent)">₹{{ "%.0f"|format(event.total_budget) }}</p>
+        {% if event.trip_type == 'group' %}
+        <p class="text-xs text-faint mt-1">{{ event.member_count }} × ₹{{ "%.0f"|format(event.contribution_per_member) }}</p>
+        {% endif %}
+    </div>
+    <div class="card p-5 stat-card stat-card-red">
+        <p class="text-xs text-faint stat-label uppercase tracking-widest mb-2">Spent</p>
+        <p class="text-2xl font-black" style="color:var(--red)">₹{{ "%.0f"|format(total_spent) }}</p>
+        <p class="text-xs text-faint mt-1">{{ pct }}% used</p>
+    </div>
+    <div class="card p-5 stat-card stat-card-green">
+        <p class="text-xs text-faint stat-label uppercase tracking-widest mb-2">Remaining</p>
+        <p class="text-2xl font-black" style="color:{% if remaining < 0 %}var(--red){% else %}var(--green){% endif %}">
+            ₹{{ "%.0f"|format(remaining) }}
+        </p>
+        <p class="text-xs text-faint mt-1">{% if remaining < 0 %}Over budget!{% else %}Left to spend{% endif %}</p>
+    </div>
+</div>
+
+<!-- Progress Bar -->
+<div class="card p-5 mb-8 anim-2">
+    <div class="flex justify-between mb-2">
+        <span class="text-sm font-bold text-muted">Trip Spending Progress</span>
+        <span class="text-sm font-black" style="color:{% if pct >= 100 %}var(--red){% else %}var(--accent){% endif %}">{{ pct }}%</span>
+    </div>
+    <div class="progress-track h-3">
+        <div class="progress-fill h-3"
+             style="width:{{ pct }}%; background:{% if pct >= 100 %}linear-gradient(90deg,var(--red),#f43f5e){% elif pct >= 80 %}linear-gradient(90deg,var(--orange),#f59e0b){% else %}linear-gradient(90deg,var(--accent),var(--accent2)){% endif %};">
+        </div>
+    </div>
+</div>
+
+<!-- Add Trip Expense -->
+{% if event.is_active %}
+<div class="card p-6 mb-8 anim-3">
+    <h3 class="font-black text-sm mb-4" style="color:var(--text)">➕ Add Trip Expense</h3>
+    <form action="{{ url_for('main.add_expense') }}" method="POST" class="flex flex-wrap gap-3 items-end">
+        <input type="hidden" name="event_id" value="{{ event.id }}">
+        <div class="flex-1 min-w-[150px]">
+            <label class="block text-xs text-faint mb-1">What for?</label>
+            <input type="text" name="title" placeholder="Food, Transport, Hotel..." class="input" required>
+        </div>
+        <div class="w-32">
+            <label class="block text-xs text-faint mb-1">Amount (₹)</label>
+            <input type="number" name="amount" step="0.01" placeholder="0" class="input" required>
+        </div>
+        <div class="w-28">
+            <label class="block text-xs text-faint mb-1">Category</label>
+            <select name="category" class="input">
+                <option value="Need">Need</option>
+                <option value="Want">Want</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Add</button>
+    </form>
+</div>
+{% endif %}
+
+<!-- Trip Expenses List -->
+<div class="card overflow-hidden anim-4">
+    <div class="p-5" style="border-bottom:1px solid var(--border);">
+        <h2 class="font-black" style="color:var(--text)">💸 Trip Expenses</h2>
+    </div>
+    {% if trip_expenses %}
+    <table class="w-full">
+        <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+                <th class="py-3 px-5 text-left text-xs font-bold uppercase tracking-widest text-faint">Date</th>
+                <th class="py-3 px-5 text-left text-xs font-bold uppercase tracking-widest text-faint">Item</th>
+                <th class="py-3 px-5 text-left text-xs font-bold uppercase tracking-widest text-faint">Category</th>
+                <th class="py-3 px-5 text-right text-xs font-bold uppercase tracking-widest text-faint">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in trip_expenses %}
+            <tr class="trow" style="border-bottom:1px solid var(--border);">
+                <td class="py-3 px-5 text-sm text-faint">{{ e.date_posted.strftime('%d %b') }}</td>
+                <td class="py-3 px-5 font-semibold" style="color:var(--text)">{{ e.title }}</td>
+                <td class="py-3 px-5">
+                    <span class="badge {% if e.category == 'Need' %}badge-blue{% elif e.category == 'Want' %}badge-purple{% else %}badge-green{% endif %}">
+                        {{ e.category }}
+                    </span>
+                </td>
+                <td class="py-3 px-5 text-right font-black" style="color:var(--text)">₹{{ "%.2f"|format(e.amount) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="py-12 text-center">
+        <p class="text-4xl mb-3">🏕️</p>
+        <p class="text-sm text-faint">No trip expenses yet.{% if event.is_active %} Add your first one above!{% endif %}</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

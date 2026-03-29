@@ -1,0 +1,111 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="mb-8 flex items-center justify-between anim-1">
+    <div>
+        <h1 class="text-3xl font-black" style="color:var(--text)">My Piggy Bank 🐷</h1>
+        <p class="text-sm text-faint">Tracking your wealth growth over time</p>
+    </div>
+    <a href="#savings-list">
+        <div class="card px-6 py-3 text-right cursor-pointer card-lift">
+            <span class="text-xs font-bold uppercase tracking-widest text-faint">Net Savings</span>
+            <p class="text-2xl font-black num-value" style="color:var(--green)">₹{{ "%.2f"|format(total_savings) }}</p>
+            <span class="text-xs text-faint italic">Click to view details ↓</span>
+        </div>
+    </a>
+</div>
+
+<div class="card p-6 mb-10 anim-2">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="font-black" style="color:var(--text)">📈 Savings Trajectory</h2>
+        {% if total_savings == 0 %}
+        <span class="badge badge-orange">No savings data yet</span>
+        {% endif %}
+    </div>
+    <div style="height:360px;">
+        <canvas id="savingsChart"></canvas>
+    </div>
+</div>
+
+<div id="savings-list" class="card overflow-hidden mb-10 anim-3">
+    <div class="p-5" style="border-bottom:1px solid var(--border);">
+        <h3 class="font-black uppercase text-sm tracking-widest" style="color:var(--text)">Savings History</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead>
+                <tr style="border-bottom:1px solid var(--border);">
+                    <th class="p-5 text-xs font-bold uppercase tracking-widest text-faint">Date</th>
+                    <th class="p-5 text-xs font-bold uppercase tracking-widest text-faint">Description</th>
+                    <th class="p-5 text-right text-xs font-bold uppercase tracking-widest text-faint">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in savings_entries %}
+                <tr class="trow" style="border-bottom:1px solid var(--border);">
+                    <td class="p-5 text-sm text-faint">{{ entry.date_posted.strftime('%d %b, %Y') }}</td>
+                    <td class="p-5 font-bold" style="color:{% if entry.amount < 0 %}var(--red){% else %}var(--text){% endif %}">
+                        {{ entry.title }}
+                    </td>
+                    <td class="p-5 text-right font-black" style="color:{% if entry.amount < 0 %}var(--red){% else %}var(--green){% endif %}">
+                        {% if entry.amount < 0 %}−{% endif %}₹{{ "%.2f"|format(entry.amount|abs) }}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not savings_entries %}
+                <tr>
+                    <td colspan="3" class="p-12 text-center text-faint italic">No savings recorded yet.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="text-center mb-10">
+    <a href="{{ url_for('main.index') }}" class="text-sm text-faint hover:text-accent transition font-bold">← Back to Dashboard</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const style = getComputedStyle(document.documentElement);
+    const green = style.getPropertyValue('--green').trim();
+    const ctx = document.getElementById('savingsChart').getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 360);
+    gradient.addColorStop(0, 'rgba(16,185,129,0.3)');
+    gradient.addColorStop(1, 'rgba(16,185,129,0)');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ labels | tojson }},
+            datasets: [{
+                label: 'Total Savings (₹)',
+                data: {{ values | tojson }},
+                borderColor: green || '#10b981',
+                backgroundColor: gradient,
+                fill: true, tension: 0.4, borderWidth: 3,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: green || '#10b981',
+                pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.75)', padding: 12, cornerRadius: 12,
+                    callbacks: { label: c => 'Balance: ₹' + c.parsed.y.toLocaleString('en-IN') }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(128,128,128,0.1)' },
+                     ticks: { callback: v => '₹' + v, color: '#64748b' } },
+                x: { grid: { display: false }, ticks: { color: '#64748b' } }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

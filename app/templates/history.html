@@ -1,0 +1,115 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 anim-1">
+    <div class="flex items-center gap-4">
+        <a href="{{ url_for('main.index') }}" class="w-10 h-10 rounded-xl flex items-center justify-center transition hover:scale-110"
+           style="background:var(--card); border:1px solid var(--border);">←</a>
+        <div>
+            <h1 class="text-2xl font-black" style="color:var(--text)">Transaction History 📁</h1>
+            <p class="text-xs text-faint">{{ all_expenses|length }} total records</p>
+        </div>
+    </div>
+    <div class="flex flex-wrap gap-2 items-center">
+        <form action="{{ url_for('main.history') }}" method="GET" class="flex gap-2">
+            <input type="text" name="search" placeholder="Search..." value="{{ request.args.get('search', '') }}"
+                   class="input" style="width:180px;">
+            <button type="submit" class="btn btn-ghost px-4 py-2">🔎</button>
+        </form>
+        <a href="{{ url_for('main.export_csv') }}" class="btn" style="background:rgba(16,185,129,0.15);color:var(--green);border:1px solid rgba(16,185,129,0.3);">
+            📥 Export CSV
+        </a>
+    </div>
+</div>
+
+<!-- Trend Chart -->
+<div class="card p-6 mb-8 anim-2">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="font-black" style="color:var(--text)">6-Month Spending Trend</h2>
+        <span class="text-xs text-faint uppercase tracking-widest">Analytics</span>
+    </div>
+    <div style="height:220px;"><canvas id="trendChart"></canvas></div>
+</div>
+
+<!-- Table -->
+<div class="card overflow-hidden anim-3">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr style="border-bottom:1px solid var(--border);">
+                    <th class="py-4 px-6 text-left text-xs font-bold uppercase tracking-widest text-faint">Date</th>
+                    <th class="py-4 px-6 text-left text-xs font-bold uppercase tracking-widest text-faint">Description</th>
+                    <th class="py-4 px-6 text-left text-xs font-bold uppercase tracking-widest text-faint">Category</th>
+                    <th class="py-4 px-6 text-right text-xs font-bold uppercase tracking-widest text-faint">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for expense in all_expenses %}
+                <tr class="trow" style="border-bottom:1px solid var(--border);">
+                    <td class="py-4 px-6">
+                        <p class="text-sm font-bold" style="color:var(--text)">{{ expense.date_posted.strftime('%d %b %Y') }}</p>
+                        <p class="text-xs text-faint">{{ expense.date_posted.strftime('%I:%M %p') }}</p>
+                    </td>
+                    <td class="py-4 px-6 font-semibold" style="color:var(--text)">{{ expense.title }}</td>
+                    <td class="py-4 px-6">
+                        <span class="badge {% if expense.category == 'Need' %}badge-blue{% elif expense.category == 'Want' %}badge-purple{% else %}badge-green{% endif %}">
+                            {{ expense.category }}
+                        </span>
+                    </td>
+                    <td class="py-4 px-6 text-right font-black" style="color:{% if expense.amount < 0 %}var(--red){% elif expense.category == 'Savings' %}var(--green){% else %}var(--text){% endif %}">
+                        {% if expense.amount < 0 %}−{% endif %}₹{{ "%.2f"|format(expense.amount|abs) }}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not all_expenses %}
+                <tr>
+                    <td colspan="4" class="py-20 text-center">
+                        <div class="text-5xl mb-3">📭</div>
+                        <p class="text-sm text-faint">No records found.</p>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const style = getComputedStyle(document.documentElement);
+    const accent = style.getPropertyValue('--accent').trim();
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 220);
+    grad.addColorStop(0, 'rgba(99,102,241,0.25)');
+    grad.addColorStop(1, 'rgba(99,102,241,0)');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ trend_labels|tojson }},
+            datasets: [{
+                data: {{ trend_values|tojson }},
+                borderColor: 'rgba(99,102,241,0.9)',
+                backgroundColor: grad,
+                fill: true, tension: 0.4, borderWidth: 3,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: 'rgba(99,102,241,0.9)',
+                pointRadius: 5, pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false },
+                tooltip: { backgroundColor:'rgba(0,0,0,0.75)', padding:12, cornerRadius:12,
+                    callbacks: { label: c => '₹' + c.parsed.y.toLocaleString('en-IN') } }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)' },
+                     ticks: { color: '#64748b', callback: v => '₹' + v } },
+                x: { grid: { display: false }, ticks: { color: '#64748b' } }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

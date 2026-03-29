@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center">
+<div class="w-full max-w-lg anim-1">
+
+    <div class="text-center mb-8">
+        <div class="text-5xl mb-3">👋</div>
+        <h1 class="text-3xl font-black" style="color:var(--text)">One quick question</h1>
+        <p class="text-sm text-faint mt-2">This helps us personalise your budget tracking experience.</p>
+    </div>
+
+    <div class="card p-8">
+        <p class="text-sm font-bold text-center mb-6" style="color:var(--text2)">How do you usually receive your money?</p>
+        <form method="POST" class="flex flex-col gap-4">
+            <label class="cursor-pointer group">
+                <input type="radio" name="income_type" value="monthly" class="hidden peer" required>
+                <div class="peer-checked:ring-2 peer-checked:ring-offset-1 peer-checked:ring-indigo-400 rounded-2xl p-5 flex items-center gap-4 transition hover:scale-[1.01]"
+                     style="background:var(--card2); border:1px solid var(--border);">
+                    <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                         style="background:rgba(99,102,241,0.12);">💼</div>
+                    <div>
+                        <p class="font-black" style="color:var(--text)">Monthly Income</p>
+                        <p class="text-xs text-faint">Salary, stipend, or fixed monthly payment</p>
+                    </div>
+                </div>
+            </label>
+
+            <label class="cursor-pointer group">
+                <input type="radio" name="income_type" value="daily" class="hidden peer">
+                <div class="peer-checked:ring-2 peer-checked:ring-offset-1 peer-checked:ring-purple-400 rounded-2xl p-5 flex items-center gap-4 transition hover:scale-[1.01]"
+                     style="background:var(--card2); border:1px solid var(--border);">
+                    <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                         style="background:rgba(168,85,247,0.12);">🎒</div>
+                    <div>
+                        <p class="font-black" style="color:var(--text)">Daily / Pocket Money</p>
+                        <p class="text-xs text-faint">Allowance, daily cash, or irregular income</p>
+                    </div>
+                </div>
+            </label>
+
+            <button type="submit" class="btn btn-primary w-full justify-center py-3 text-base mt-2">
+                Let's Go 🚀
+            </button>
+        </form>
+    </div>
+</div>
+</div>
+{% endblock %}

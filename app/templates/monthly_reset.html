@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="max-w-md mx-auto mt-16">
+    <div class="card p-10 text-center">
+
+        <div class="text-6xl mb-4">🗓️</div>
+        <h2 class="text-2xl font-black mb-1" style="color:var(--text)">New Month, Fresh Start!</h2>
+        <p class="text-sm mb-8" style="color:var(--text2)">{{ today.strftime('%B %Y') }} has begun. Let's review last month.</p>
+
+        {% if leftover is defined %}
+        <div class="rounded-2xl p-5 mb-6" style="background:var(--card2); border:1px solid var(--border);">
+            <p class="text-xs font-bold uppercase tracking-widest mb-3" style="color:var(--text3)">{{ last_month_name }} Summary</p>
+            <div class="flex justify-around gap-4">
+                <div>
+                    <p class="text-xs" style="color:var(--text2)">Budget</p>
+                    <p class="text-xl font-black" style="color:var(--accent)">₹{{ "%.0f"|format(current_user.budget) }}</p>
+                </div>
+                <div>
+                    <p class="text-xs" style="color:var(--text2)">Spent</p>
+                    <p class="text-xl font-black" style="color:var(--red)">₹{{ "%.0f"|format(last_month_spent) }}</p>
+                </div>
+                <div>
+                    <p class="text-xs" style="color:var(--text2)">Leftover</p>
+                    <p class="text-xl font-black" style="color:{% if leftover > 0 %}var(--green){% else %}var(--red){% endif %}">
+                        ₹{{ "%.0f"|format(leftover) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {% if leftover > 0 %}
+        <div class="rounded-2xl p-4 mb-6 flex items-center gap-3" style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.25);">
+            <span class="text-2xl">🐷</span>
+            <p class="text-sm font-semibold text-left" style="color:var(--green)">
+                ₹{{ "%.0f"|format(leftover) }} will be automatically saved to your Piggy Bank!
+            </p>
+        </div>
+        {% else %}
+        <div class="rounded-2xl p-4 mb-6 flex items-center gap-3" style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2);">
+            <span class="text-2xl">⚠️</span>
+            <p class="text-sm font-semibold text-left" style="color:var(--red)">
+                You went over budget last month. Try to spend less this month!
+            </p>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        <form method="POST">
+            <button type="submit" class="btn btn-primary w-full justify-center text-base py-3">
+                Start {{ today.strftime('%B') }} 🚀
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
