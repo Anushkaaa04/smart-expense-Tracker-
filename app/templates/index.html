@@ -148,354 +148,228 @@ function dismissPopup() {
 </a>
 {% endif %}
 
-<!-- Hero Banner -->
-<div class="rounded-3xl p-8 mb-8 anim-1 relative overflow-hidden"
-     style="background: {% if is_daily %}linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #06b6d4 100%){% else %}linear-gradient(135deg, var(--accent) 0%, var(--accent2) 60%, var(--accent3) 100%){% endif %}; box-shadow: var(--shadow-lg);">
-    <div class="absolute inset-0 opacity-10" style="background: radial-gradient(circle at 80% 50%, white 0%, transparent 60%);"></div>
-    <div class="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div>
-            <p class="text-white/70 text-sm font-semibold uppercase tracking-widest mb-1">Welcome back 👋</p>
-            <h1 class="text-3xl font-black text-white mb-3">{{ current_user.username }}</h1>
-            <div class="flex flex-wrap items-center gap-3">
-                <a href="{{ url_for('main.streaks') }}"
-                   class="flex items-center gap-2 bg-white/15 hover:bg-white/25 transition px-4 py-2 rounded-xl border border-white/20 no-underline">
-                    <span class="text-xl">🔥</span>
-                    <span class="text-white font-black text-lg">{{ streak_count }}</span>
-                    <span class="text-white/70 text-xs font-medium">day streak</span>
-                </a>
-                {% if current_user.income_type == 'daily' %}
-                    <span class="bg-white/15 text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-white/20">🎒 Pocket Money</span>
-                    <form action="{{ url_for('main.switch_income_type') }}" method="POST" class="inline">
-                        <button type="submit" class="text-white/70 hover:text-white text-xs transition bg-transparent border-none cursor-pointer">Switch to Monthly →</button>
-                    </form>
-                {% elif current_user.income_type == 'monthly' %}
-                    <span class="bg-white/15 text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-white/20">💼 Monthly Income</span>
-                    <form action="{{ url_for('main.switch_income_type') }}" method="POST" class="inline">
-                        <button type="submit" class="text-white/70 hover:text-white text-xs transition bg-transparent border-none cursor-pointer">Switch to Daily →</button>
-                    </form>
-                {% else %}
-                    <a href="{{ url_for('main.onboarding') }}" class="text-white/70 hover:text-white text-xs transition">Set income type →</a>
-                {% endif %}
-            </div>
-        </div>
-        <form action="{{ url_for('main.update_budget') }}" method="POST" class="flex gap-2 w-full md:w-auto">
-            <input type="number" name="new_budget" step="0.01"
-                   placeholder="{% if is_daily %}Set daily budget...{% else %}Set monthly budget...{% endif %}"
-                   class="flex-1 md:w-52 px-4 py-2.5 rounded-xl bg-white/15 border border-white/25 text-white placeholder-white/50 outline-none focus:bg-white/25 transition text-sm font-medium" required>
-            <button type="submit" class="px-5 py-2.5 bg-white text-indigo-700 font-black rounded-xl hover:bg-white/90 transition shadow-lg whitespace-nowrap text-sm">
-                {% if is_daily %}Set Daily{% else %}Update{% endif %}
-            </button>
-        </form>
+<!-- Minimal Hero — centered focal point -->
+<div class="mb-8 anim-1 pt-6 text-center">
+    <!-- AI Insight — elegant italic pill under balance -->
+    <div class="flex items-center justify-center gap-2 mb-8">
+        <span class="w-1.5 h-1.5 rounded-full ai-pulse flex-shrink-0"
+              style="background:var(--{% if health_color == 'red' %}red{% elif health_color == 'yellow' %}orange{% else %}green{% endif %})"></span>
+        <p class="insight-pill">{{ advice }}</p>
     </div>
-</div>
 
-<!-- Stats Grid -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-    <div class="card stat-card-blue p-5 anim-2">
-        <div class="flex items-center justify-between mb-4">
-            <span class="text-xs font-bold uppercase tracking-widest text-faint stat-label">{{ budget_label }}</span>
-            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base"
-                 style="background:rgba(99,102,241,0.12);">{% if is_daily %}📅{% else %}💰{% endif %}</div>
-        </div>
-        <button id="budgetBtn" onclick="toggleBudgetHistory(event)"
-                class="text-left w-full" style="background:none;border:none;cursor:pointer;padding:0;">
-            <p class="text-2xl font-black num-value transition hover:opacity-75" style="color:var(--accent)">₹{{ "%.0f"|format(budget) }}</p>
-            <p class="text-xs mt-1 flex items-center gap-1" style="color:var(--text3)">
-                {% if is_daily %}Per day{% else %}This month{% endif %} <span style="color:var(--accent);font-size:10px;">▾ history</span>
-            </p>
+    <!-- Balance -->
+    <p class="lv-label mb-3">
+        {% if is_daily %}Today's Balance{% else %}Available Balance{% endif %}
+    </p>
+    <div class="flex items-start justify-center mb-6">
+        <span class="balance-currency">₹</span>
+        <span class="balance-amount">{{ "%.0f"|format([budget - total_spent, 0]|max) }}</span>
+    </div>
+
+    <!-- Metrics row -->
+    <div class="flex items-center justify-center gap-5 flex-wrap mb-6">
+        <button id="budgetBtn" onclick="toggleBudgetHistory(event)" class="text-center bg-transparent border-none cursor-pointer p-0 group">
+            <p class="metric-label mb-0.5">{{ budget_label }}</p>
+            <p class="metric-value text-base group-hover:opacity-60 transition">₹{{ "%.0f"|format(budget) }}</p>
         </button>
-    </div>
-
-    <div class="card stat-card-red p-5 anim-2">
-        <div class="flex items-center justify-between mb-4">
-            <span class="text-xs font-bold uppercase tracking-widest text-faint stat-label">Spent</span>
-            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base"
-                 style="background:rgba(239,68,68,0.12);">💸</div>
-        </div>
-        <button id="spentBtn" onclick="togglePanel(event,'spentPanel','spentBtn')"
-                class="text-left w-full" style="background:none;border:none;cursor:pointer;padding:0;">
-            <p class="text-2xl font-black num-value transition hover:opacity-75" style="color:var(--red)">₹{{ "%.0f"|format(total_spent) }}</p>
-            <p class="text-xs mt-1 flex items-center gap-1" style="color:var(--text3)">
-                {{ spent_label }} <span style="color:var(--red);font-size:10px;">▾ history</span>
-            </p>
+        <div class="w-px h-5" style="background:var(--border)"></div>
+        <button id="spentBtn" onclick="togglePanel(event,'spentPanel','spentBtn')" class="text-center bg-transparent border-none cursor-pointer p-0 group">
+            <p class="metric-label mb-0.5">Spent</p>
+            <p class="metric-value text-base group-hover:opacity-60 transition" style="color:var(--red)">₹{{ "%.0f"|format(total_spent) }}</p>
         </button>
-    </div>
-
-    <div class="card stat-card-green p-5 anim-3">
-        <div class="flex items-center justify-between mb-4">
-            <span class="text-xs font-bold uppercase tracking-widest text-faint stat-label">Savings</span>
-            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-base"
-                 style="background:rgba(16,185,129,0.12);">🐷</div>
-        </div>
-        <button id="savingsBtn" onclick="togglePanel(event,'savingsPanel','savingsBtn')"
-                class="text-left w-full" style="background:none;border:none;cursor:pointer;padding:0;">
-            <p class="text-2xl font-black num-value transition hover:opacity-75" style="color:var(--green)">₹{{ "%.0f"|format(chart_data[2]) }}</p>
-            <p class="text-xs mt-1 flex items-center gap-1" style="color:var(--text3)">
-                Saved this month <span style="color:var(--green);font-size:10px;">▾ history</span>
-            </p>
+        <div class="w-px h-5" style="background:var(--border)"></div>
+        <button id="savingsBtn" onclick="togglePanel(event,'savingsPanel','savingsBtn')" class="text-center bg-transparent border-none cursor-pointer p-0 group">
+            <p class="metric-label mb-0.5">Saved</p>
+            <p class="metric-value text-base group-hover:opacity-60 transition" style="color:var(--green)">₹{{ "%.0f"|format(chart_data[2]) }}</p>
         </button>
-    </div>
-
-    <div class="card p-5 anim-3" style="border-top: 3px solid var(--{% if health_color == 'red' %}red{% elif health_color == 'yellow' %}orange{% else %}green{% endif %});">
-        <div class="flex items-center justify-between mb-4">
-            <span class="text-xs font-bold uppercase tracking-widest text-faint">AI Insight</span>
-            <span class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full ai-pulse"
-                      style="background:var(--{% if health_color == 'red' %}red{% elif health_color == 'yellow' %}orange{% else %}green{% endif %})"></span>
-                <span class="text-[10px] font-black"
-                      style="color:var(--{% if health_color == 'red' %}red{% elif health_color == 'yellow' %}orange{% else %}green{% endif %})">LIVE</span>
-            </span>
+        <div class="w-px h-5" style="background:var(--border)"></div>
+        <div class="flex items-center gap-2">
+            {% if current_user.income_type == 'daily' %}
+                <span class="badge badge-blue text-[10px]">🎒 Daily</span>
+                <form action="{{ url_for('main.switch_income_type') }}" method="POST" class="inline">
+                    <button type="submit" class="text-xs text-faint hover:text-accent transition bg-transparent border-none cursor-pointer">→ Monthly</button>
+                </form>
+            {% elif current_user.income_type == 'monthly' %}
+                <span class="badge badge-blue text-[10px]">💼 Monthly</span>
+                <form action="{{ url_for('main.switch_income_type') }}" method="POST" class="inline">
+                    <button type="submit" class="text-xs text-faint hover:text-accent transition bg-transparent border-none cursor-pointer">→ Daily</button>
+                </form>
+            {% endif %}
+            <a href="{{ url_for('main.streaks') }}" class="flex items-center gap-1 no-underline">
+                <span>🔥</span><span class="text-xs font-bold" style="color:var(--orange)">{{ streak_count }}</span>
+            </a>
         </div>
-        <p class="text-xs font-semibold text-muted leading-relaxed">{{ advice }}</p>
     </div>
-</div>
 
-<!-- Budget Progress -->
-<div class="card p-6 mb-8 anim-3">
-    <div class="flex justify-between items-center mb-3">
-        <span class="text-sm font-bold text-muted">{% if is_daily %}Today's Spending Progress{% else %}Monthly Spending Progress{% endif %}</span>
-        <span class="text-sm font-black"
-              style="color:{% if budget == 0 and total_spent > 0 %}var(--red){% elif progress_pct >= 100 %}var(--red){% else %}var(--accent){% endif %}">
-            {% if budget == 0 and total_spent > 0 %}No budget set{% else %}{{ progress_pct|round|int }}%{% endif %}
-        </span>
-    </div>
-    <div class="progress-track h-3">
+    <!-- Thin progress bar -->
+    <div class="max-w-xs mx-auto progress-track h-1">
         {% set display_pct = 100 if (budget == 0 and total_spent > 0) else progress_pct %}
-        <div class="progress-fill h-3"
-             style="width:{{ display_pct }}%;
-             background: linear-gradient(90deg,
-             {% if budget == 0 and total_spent > 0 %}var(--red),#f43f5e
-             {% elif display_pct >= 100 %}var(--red),#f43f5e
-             {% elif display_pct >= 80 %}var(--orange),#f59e0b
-             {% else %}var(--accent),var(--accent2){% endif %});">
-        </div>
+        <div class="progress-fill h-1" style="width:{{ display_pct }}%;background:{% if display_pct >= 100 %}var(--red){% elif display_pct >= 80 %}var(--orange){% else %}var(--accent){% endif %};"></div>
     </div>
-    <div class="flex justify-between mt-2">
-        <span class="text-xs text-faint">₹0 spent</span>
-        {% if budget == 0 %}
-        <span class="text-xs" style="color:var(--red)">⚠️ Set a budget to track progress</span>
-        {% else %}
-        <span class="text-xs text-faint">₹{{ "%.0f"|format(budget) }} {% if is_daily %}/day{% endif %}</span>
-        {% endif %}
-    </div>
+    <p class="text-[10px] text-faint mt-1">{{ progress_pct|round|int }}% used</p>
 </div>
 
-<!-- Feature Cards -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 anim-4">
-    <a href="{{ url_for('main.savings_dashboard') }}"
-       class="card card-lift p-5 flex items-center gap-4 no-underline group" style="text-decoration:none;">
-        <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 transition group-hover:scale-110"
-             style="background:rgba(236,72,153,0.12); border:1px solid rgba(236,72,153,0.2);">🐷</div>
-        <div class="flex-1 min-w-0">
-            <p class="font-bold text-sm" style="color:var(--text)">Savings Bank</p>
-            <p class="text-xs font-bold" style="color:var(--green)">₹{{ "%.0f"|format(chart_data[2]) }} saved</p>
-        </div>
-        <span class="text-faint group-hover:text-accent transition text-lg">→</span>
-    </a>
+<!-- Section divider -->
+<div class="mb-6" style="border-top:1px solid var(--border);"></div>
 
-    <div class="card p-5 flex items-center gap-4">
-        <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
-             style="background:rgba(6,182,212,0.12); border:1px solid rgba(6,182,212,0.2);">✈️</div>
-        <div class="flex-1 min-w-0">
-            <p class="font-bold text-sm" style="color:var(--text)">Trip Mode</p>
-            <p class="text-xs text-faint">Group event budgets</p>
-        </div>
-        <div class="flex flex-col gap-1 items-end">
-            <a href="{{ url_for('main.new_event') }}" class="btn btn-ghost text-xs px-3 py-1.5" style="font-size:11px;">+ New</a>
-            <a href="{{ url_for('main.list_events') }}" class="text-xs text-faint hover:text-accent transition" style="text-decoration:none;">View →</a>
-        </div>
-    </div>
-
-    <a href="{{ url_for('main.wishlist') }}" class="card card-lift p-5 flex items-center gap-4 no-underline group" style="text-decoration:none; border-color:rgba(139,92,246,0.2);">
-        <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 transition group-hover:scale-110"
-             style="background:rgba(139,92,246,0.12); border:1px solid rgba(139,92,246,0.2);">✨</div>
-        <div class="flex-1 min-w-0">
-            <p class="font-bold text-sm" style="color:var(--text)">Wishlist</p>
-            <p class="text-xs text-faint">Track saving goals</p>
-        </div>
-        <span class="text-faint group-hover:text-accent transition text-lg">→</span>
-    </a>
+<!-- Activity header + Tools toggle -->
+<div class="flex items-center justify-between mb-5">
+    <h2 class="font-black text-sm uppercase tracking-widest text-faint">Recent Activity</h2>
+    <button onclick="document.getElementById('toolsDrawer').classList.toggle('hidden')"
+            class="text-xs font-semibold text-faint hover:text-accent transition bg-transparent border-none cursor-pointer flex items-center gap-1">
+        ⚙️ Tools
+    </button>
 </div>
 
-<!-- Gift Money + Quick Add -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 anim-4">
-    <div class="card p-6">
-        <div class="flex items-center gap-3 mb-5">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                 style="background:rgba(236,72,153,0.12); border:1px solid rgba(236,72,153,0.2);">🎁</div>
-            <div>
-                <h3 class="font-bold text-sm" style="color:var(--text)">Received Gift Money?</h3>
-                <p class="text-xs text-faint">Goes straight to your savings bank</p>
-            </div>
-        </div>
-        <form action="{{ url_for('main.gift_money') }}" method="POST" class="flex flex-col gap-3">
-            <input type="text" name="description" placeholder="e.g. Birthday gift from Dad" class="input">
-            <div class="flex gap-3">
-                <input type="number" name="amount" step="0.01" placeholder="Amount (₹)" required class="input flex-1">
-                <button type="submit" class="btn whitespace-nowrap"
-                        style="background:linear-gradient(135deg,#ec4899,#f43f5e);color:white;box-shadow:0 4px 16px rgba(236,72,153,0.3);">
-                    Add 🐷
-                </button>
-            </div>
-        </form>
-    </div>
-
-    <div class="card p-6">
-        <div class="flex items-center justify-between mb-5">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                     style="background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.2);">⚡</div>
-                <div>
-                    <h3 class="font-bold text-sm" style="color:var(--text)">Quick Add</h3>
-                    <p class="text-xs text-faint">One-click daily expenses</p>
+<!-- Tools drawer -->
+<div id="toolsDrawer" class="hidden mb-6 anim-1">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 p-5 rounded-2xl" style="background:var(--card2);border:1px solid var(--border);">
+        <div>
+            <h3 class="font-bold text-sm mb-3" style="color:var(--text)">🎁 Gift Money → Piggy Bank</h3>
+            <form action="{{ url_for('main.gift_money') }}" method="POST" class="flex flex-col gap-2">
+                <input type="text" name="description" placeholder="e.g. Birthday gift from Dad" class="input">
+                <div class="flex gap-2">
+                    <input type="number" name="amount" step="0.01" placeholder="Amount (₹)" required class="input flex-1">
+                    <button type="submit" class="btn whitespace-nowrap text-sm" style="background:linear-gradient(135deg,#ec4899,#f43f5e);color:white;">Add 🐷</button>
                 </div>
-            </div>
-            <button onclick="document.getElementById('qaForm').classList.toggle('hidden')"
-                    class="btn btn-ghost text-xs px-3 py-1.5">+ Template</button>
-        </div>
-
-        <div id="qaForm" class="hidden mb-4 p-4 rounded-xl" style="background:var(--card2); border:1px solid var(--border);">
-            <form action="{{ url_for('main.quick_add') }}" method="POST" class="flex flex-wrap gap-2 items-end">
-                <input type="text" name="title" placeholder="Coffee" required class="input flex-1 min-w-[90px]">
-                <input type="number" name="amount" step="0.01" placeholder="₹" required class="input w-20">
-                <select name="category" class="input w-28">
-                    <option value="Need">Need</option>
-                    <option value="Want">Want</option>
-                    <option value="Savings">Savings</option>
-                </select>
-                <button type="submit" class="btn btn-primary text-xs px-4 py-2">Save</button>
             </form>
         </div>
-
-        {% if quick_expenses %}
-        <div class="flex flex-wrap gap-2">
-            {% for qe in quick_expenses %}
-            <div class="flex items-center gap-1 rounded-xl px-1 py-1" style="background:var(--card2); border:1px solid var(--border);">
-                <form action="{{ url_for('main.log_quick_expense', qe_id=qe.id) }}" method="POST">
-                    <button type="submit" class="badge px-3 py-1.5 text-xs font-bold cursor-pointer transition hover:opacity-80
-                        {% if qe.category == 'Need' %}badge-blue{% elif qe.category == 'Want' %}badge-purple{% else %}badge-green{% endif %}">
-                        {{ qe.title }} · ₹{{ "%.0f"|format(qe.amount) }}
-                    </button>
-                </form>
-                <form action="{{ url_for('main.delete_quick_expense', qe_id=qe.id) }}" method="POST">
-                    <button type="submit" class="text-xs px-1.5 transition text-faint hover:text-red-400 bg-transparent border-none cursor-pointer">✕</button>
+        <div>
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold text-sm" style="color:var(--text)">⚡ Quick Add</h3>
+                <button onclick="document.getElementById('qaForm').classList.toggle('hidden')" class="btn btn-ghost text-xs px-3 py-1.5">+ Template</button>
+            </div>
+            <div id="qaForm" class="hidden mb-3 p-3 rounded-xl" style="background:var(--card);border:1px solid var(--border);">
+                <form action="{{ url_for('main.quick_add') }}" method="POST" class="flex flex-wrap gap-2 items-end">
+                    <input type="text" name="title" placeholder="Coffee" required class="input flex-1 min-w-[80px]">
+                    <input type="number" name="amount" step="0.01" placeholder="₹" required class="input w-16">
+                    <select name="category" class="input w-24">
+                        <option value="Need">Essential</option>
+                        <option value="Want">Desire</option>
+                        <option value="Savings">Savings</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary text-xs px-3 py-2">Save</button>
                 </form>
             </div>
-            {% endfor %}
+            {% if quick_expenses %}
+            <div class="flex flex-wrap gap-2">
+                {% for qe in quick_expenses %}
+                <div class="flex items-center gap-0.5 rounded-xl px-1 py-1" style="background:var(--card);border:1px solid var(--border);">
+                    <form action="{{ url_for('main.log_quick_expense', qe_id=qe.id) }}" method="POST">
+                        <button type="submit" class="badge px-3 py-1.5 text-xs font-bold cursor-pointer transition hover:opacity-80 {% if qe.category == 'Need' %}badge-blue{% elif qe.category == 'Want' %}badge-purple{% else %}badge-green{% endif %}">
+                            {{ qe.title }} · ₹{{ "%.0f"|format(qe.amount) }}
+                        </button>
+                    </form>
+                    <form action="{{ url_for('main.delete_quick_expense', qe_id=qe.id) }}" method="POST">
+                        <button type="submit" class="text-xs px-1 text-faint hover:text-red-400 bg-transparent border-none cursor-pointer">✕</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-xs text-faint italic">No templates yet.</p>
+            {% endif %}
         </div>
-        {% else %}
-        <p class="text-xs text-faint italic">No templates yet. Add one above.</p>
-        {% endif %}
     </div>
 </div>
-
-<!-- Transactions -->
-<div class="card overflow-hidden mb-8 anim-5">
-    <div class="p-6 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between" style="border-bottom:1px solid var(--border);">
-        <h2 class="font-black text-lg flex items-center gap-2" style="color:var(--text)">💸 Recent Expenses</h2>
+<!-- Transactions — section-card with defined home -->
+<!-- Transactions — clean list, no table -->
+<div class="aero-card mb-6 anim-5">
+    <div class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between px-5 py-4" style="border-bottom:1px solid rgba(0,0,0,0.04);">
+        <h2 class="lv-value text-sm">Recent Expenses</h2>
         <form action="{{ url_for('main.index') }}" method="GET" class="flex flex-wrap gap-2 items-center">
-            <input type="text" name="search" placeholder="Search..." value="{{ request.args.get('search', '') }}" class="input" style="width:160px;">
-            <select name="category" class="input" style="width:150px;">
-                <option value="All">All Categories</option>
-                <option value="Need" {% if request.args.get('category') == 'Need' %}selected{% endif %}>Need</option>
-                <option value="Want" {% if request.args.get('category') == 'Want' %}selected{% endif %}>Want</option>
+            <input type="text" name="search" placeholder="Search..." value="{{ request.args.get('search', '') }}" class="input" style="width:140px;padding:7px 12px;font-size:13px;">
+            <select name="category" class="input" style="width:130px;padding:7px 12px;font-size:13px;">
+                <option value="All">All</option>
+                <option value="Need" {% if request.args.get('category') == 'Need' %}selected{% endif %}>Essential</option>
+                <option value="Want" {% if request.args.get('category') == 'Want' %}selected{% endif %}>Desire</option>
                 <option value="Savings" {% if request.args.get('category') == 'Savings' %}selected{% endif %}>Savings</option>
                 <option value="Picnic" {% if request.args.get('category') == 'Picnic' %}selected{% endif %}>Picnic</option>
             </select>
-            <button type="submit" class="btn btn-primary text-sm px-4 py-2">Filter</button>
+            <button type="submit" class="btn btn-primary text-xs px-3 py-2">Filter</button>
         </form>
     </div>
-    <div class="overflow-x-auto">
-        <table class="w-full">
-            <thead>
-                <tr style="border-bottom:1px solid var(--border);">
-                    <th class="py-3 px-6 text-left text-xs font-bold uppercase tracking-widest text-faint">Date</th>
-                    <th class="py-3 px-6 text-left text-xs font-bold uppercase tracking-widest text-faint">Item</th>
-                    <th class="py-3 px-6 text-left text-xs font-bold uppercase tracking-widest text-faint">Category</th>
-                    <th class="py-3 px-6 text-right text-xs font-bold uppercase tracking-widest text-faint">Amount</th>
-                    <th class="py-3 px-6 text-center text-xs font-bold uppercase tracking-widest text-faint">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for expense in expenses %}
-                {% if expense.id in high_expense_ids %}
-                    {% set rc = 'red' %}
-                {% elif expense.id in medium_expense_ids %}
-                    {% set rc = 'orange' %}
-                {% else %}
-                    {% set rc = 'normal' %}
-                {% endif %}
-                <tr class="trow" style="border-bottom:1px solid var(--border);
-                    {% if expense.id in over_budget_ids %}background:rgba(239,68,68,0.05);{% endif %}">
-                    <td class="py-4 px-6 text-sm font-medium"
-                        style="color:{% if rc == 'red' %}var(--red){% elif rc == 'orange' %}var(--orange){% else %}var(--text2){% endif %}">
-                        {{ expense.date_posted.strftime('%d %b') }}
-                    </td>
-                    <td class="py-4 px-6 font-semibold"
-                        style="color:{% if rc == 'red' %}var(--red){% elif rc == 'orange' %}var(--orange){% else %}var(--text){% endif %}">
-                        {{ expense.title }}
-                        {% if expense.id in over_budget_ids %}
-                        <span class="badge badge-red ml-2">{% if is_daily %}Over Daily Limit{% else %}Over Budget{% endif %}</span>
-                        {% endif %}
-                    </td>
-                    <td class="py-4 px-6">
-                        <span class="badge {% if expense.category == 'Need' %}badge-blue{% elif expense.category == 'Want' %}badge-purple{% elif expense.category == 'Picnic' %}badge-picnic{% else %}badge-green{% endif %}">
-                            {{ expense.category }}
-                        </span>
-                    </td>
-                    <td class="py-4 px-6 text-right font-black text-base"
-                        style="color:{% if rc == 'red' %}var(--red){% elif rc == 'orange' %}var(--orange){% else %}var(--text){% endif %}">
-                        ₹{{ "%.2f"|format(expense.amount) }}
-                    </td>
-                    <td class="py-4 px-6 text-center">
-                        <div class="flex items-center justify-center gap-2">
-                            <a href="{{ url_for('main.edit_expense', expense_id=expense.id) }}"
-                               class="w-8 h-8 rounded-lg flex items-center justify-center transition text-sm hover:scale-110"
-                               style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2);">✏️</a>
-                            <form action="{{ url_for('main.delete_expense', expense_id=expense.id) }}" method="POST">
-                                <button type="submit"
-                                        class="w-8 h-8 rounded-lg flex items-center justify-center transition text-sm hover:scale-110 cursor-pointer"
-                                        style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.2);">🗑️</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-                {% if not expenses %}
-                <tr><td colspan="5" class="py-16 text-center text-faint text-sm">No expenses this month yet.</td></tr>
-                {% endif %}
-            </tbody>
-        </table>
+
+    <div class="px-2 py-2">
+        {% for expense in expenses %}
+        {% if expense.id in high_expense_ids %}{% set rc = 'red' %}
+        {% elif expense.id in medium_expense_ids %}{% set rc = 'orange' %}
+        {% else %}{% set rc = 'normal' %}{% endif %}
+
+        <div class="expense-item {% if expense.id in over_budget_ids %}over-budget-row{% endif %}">
+            <!-- Category icon -->
+            <div class="cat-icon {% if expense.category == 'Need' %}cat-icon-need{% elif expense.category == 'Want' %}cat-icon-want{% elif expense.category == 'Picnic' %}cat-icon-picnic{% else %}cat-icon-savings{% endif %}">
+                {% if expense.category == 'Need' %}🏠
+                {% elif expense.category == 'Want' %}🎮
+                {% elif expense.category == 'Picnic' %}🏕️
+                {% else %}🐷{% endif %}
+            </div>
+
+            <!-- Title + date -->
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold truncate" style="color:{% if rc == 'red' %}var(--red){% elif rc == 'orange' %}var(--orange){% else %}#1A1A2E{% endif %}">
+                    {{ expense.title }}
+                    {% if expense.id in over_budget_ids %}<span class="badge badge-red ml-1 text-[9px]">Over</span>{% endif %}
+                </p>
+                <p class="text-xs mt-0.5" style="color:#aaa">{{ expense.date_posted.strftime('%d %b') }} · {% if expense.category == 'Need' %}Essential{% elif expense.category == 'Want' %}Desire{% else %}{{ expense.category }}{% endif %}</p>
+            </div>
+
+            <!-- Amount -->
+            <p class="text-sm font-semibold flex-shrink-0" style="color:{% if rc == 'red' %}var(--red){% elif rc == 'orange' %}var(--orange){% elif expense.category == 'Savings' %}var(--green){% else %}#1A1A2E{% endif %}">
+                ₹{{ "%.0f"|format(expense.amount|abs) }}
+            </p>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-1 flex-shrink-0">
+                <a href="{{ url_for('main.edit_expense', expense_id=expense.id) }}"
+                   class="w-7 h-7 rounded-lg flex items-center justify-center text-xs hover:scale-110"
+                   style="background:rgba(99,102,241,0.08);">✏️</a>
+                <form action="{{ url_for('main.delete_expense', expense_id=expense.id) }}" method="POST">
+                    <button type="submit" class="w-7 h-7 rounded-lg flex items-center justify-center text-xs hover:scale-110 cursor-pointer"
+                            style="background:rgba(239,68,68,0.08);">🗑️</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not expenses %}
+        <div class="py-14 text-center">
+            <p class="text-3xl mb-2">📭</p>
+            <p class="text-sm" style="color:#aaa">No expenses yet.</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 
-<!-- Chart -->
-<div class="card p-8 anim-5">
-    <h2 class="font-black text-lg mb-8 flex items-center gap-2" style="color:var(--text)">📊 Spending Breakdown</h2>
-    <div class="flex flex-col md:flex-row items-center justify-around gap-10">
-        <div style="width:100%; max-width:220px;"><canvas id="expenditureChart"></canvas></div>
-        <div class="flex flex-col gap-3 w-full md:w-auto">
-            <div class="flex items-center justify-between gap-10 p-4 rounded-2xl" style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.15);">
+<!-- Chart — aero card with gutter -->
+<div class="aero-card p-6 mb-8 anim-5">
+    <h2 class="lv-value text-sm mb-5">Spending Breakdown</h2>
+    <div class="flex flex-col md:flex-row items-center gap-8">
+        <div style="width:160px;height:160px;flex-shrink:0;"><canvas id="expenditureChart"></canvas></div>
+        <div class="flex flex-col gap-3 flex-1 max-w-xs">
+            <div class="flex items-center justify-between py-2">
                 <div class="flex items-center gap-3">
-                    <div class="w-3 h-3 rounded-full" style="background:var(--accent)"></div>
-                    <span class="text-sm font-bold text-muted uppercase tracking-wider">Needs</span>
+                    <div class="cat-icon cat-icon-need" style="width:32px;height:32px;font-size:14px;">🏠</div>
+                    <span class="lv-label" style="letter-spacing:0.05em;">Essentials</span>
                 </div>
-                <span class="text-lg font-black" style="color:var(--accent)">₹{{ "%.0f"|format(chart_data[0]) }}</span>
+                <span class="lv-value text-sm">₹{{ "%.0f"|format(chart_data[0]) }}</span>
             </div>
-            <div class="flex items-center justify-between gap-10 p-4 rounded-2xl" style="background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.15);">
+            <div style="height:1px;background:rgba(0,0,0,0.04);"></div>
+            <div class="flex items-center justify-between py-2">
                 <div class="flex items-center gap-3">
-                    <div class="w-3 h-3 rounded-full" style="background:var(--accent2)"></div>
-                    <span class="text-sm font-bold text-muted uppercase tracking-wider">Wants</span>
+                    <div class="cat-icon cat-icon-want" style="width:32px;height:32px;font-size:14px;">🎮</div>
+                    <span class="lv-label" style="letter-spacing:0.05em;">Desires</span>
                 </div>
-                <span class="text-lg font-black" style="color:var(--accent2)">₹{{ "%.0f"|format(chart_data[1]) }}</span>
+                <span class="lv-value text-sm">₹{{ "%.0f"|format(chart_data[1]) }}</span>
             </div>
-            <div class="flex items-center justify-between gap-10 p-4 rounded-2xl" style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.15);">
+            <div style="height:1px;background:rgba(0,0,0,0.04);"></div>
+            <div class="flex items-center justify-between py-2">
                 <div class="flex items-center gap-3">
-                    <div class="w-3 h-3 rounded-full" style="background:var(--green)"></div>
-                    <span class="text-sm font-bold text-muted uppercase tracking-wider">Savings</span>
+                    <div class="cat-icon cat-icon-savings" style="width:32px;height:32px;font-size:14px;">🐷</div>
+                    <span class="lv-label" style="letter-spacing:0.05em;">Savings</span>
                 </div>
-                <span class="text-lg font-black" style="color:var(--green)">₹{{ "%.0f"|format(chart_data[2]) }}</span>
-            </div>
+                <span class="lv-value text-sm" style="color:var(--green)">₹{{ "%.0f"|format(chart_data[2]) }}</span>
+            </div>            </div>
         </div>
     </div>
 </div>
@@ -615,7 +489,7 @@ const ctx = document.getElementById('expenditureChart').getContext('2d');
 new Chart(ctx, {
     type: 'doughnut',
     data: {
-        labels: ['Needs', 'Wants', 'Savings'],
+        labels: ['Essentials', 'Desires', 'Savings'],
         datasets: [{
             data: {{ chart_data | tojson }},
             backgroundColor: [
@@ -644,12 +518,43 @@ new Chart(ctx, {
 });
 </script>
 
-<!-- Floating Add Button — opens modal -->
-<button onclick="openAddModal()"
-   class="fixed bottom-8 right-8 z-40 flex items-center gap-2 font-black text-white px-6 py-4 rounded-2xl shadow-2xl transition-all hover:scale-105 hover:-translate-y-1"
-   style="background:linear-gradient(135deg,var(--accent),var(--accent2)); box-shadow:0 8px 32px rgba(99,102,241,0.45);">
-    <span class="text-2xl leading-none">+</span> Add Expense
-</button>
+<!-- Stats Drawer Overlay -->
+<div id="statsDrawerOverlay" onclick="closeStatsDrawer()"></div>
+
+<!-- Stats Drawer Panel -->
+<div id="statsDrawer">
+    <div class="flex items-center justify-between mb-8">
+        <h2 class="font-bold text-lg" style="color:var(--text)">Analytics</h2>
+        <button onclick="closeStatsDrawer()" class="w-8 h-8 rounded-full flex items-center justify-center text-sm hover:scale-110 transition"
+                style="background:var(--card2);border:1px solid var(--border);color:var(--text2);">✕</button>
+    </div>
+    <div class="flex flex-col gap-6">
+        <div>
+            <p class="lv-label mb-2">Monthly Budget</p>
+            <p class="balance-amount" style="font-size:2rem;">₹{{ "%.0f"|format(budget) }}</p>
+        </div>
+        <div style="height:1px;background:var(--border);"></div>
+        <div class="grid grid-cols-2 gap-4">
+            <div><p class="lv-label mb-1">Spent</p><p class="lv-value text-lg" style="color:var(--red)">₹{{ "%.0f"|format(total_spent) }}</p></div>
+            <div><p class="lv-label mb-1">Saved</p><p class="lv-value text-lg" style="color:var(--green)">₹{{ "%.0f"|format(chart_data[2]) }}</p></div>
+            <div><p class="lv-label mb-1">Essentials</p><p class="lv-value text-lg">₹{{ "%.0f"|format(chart_data[0]) }}</p></div>
+            <div><p class="lv-label mb-1">Desires</p><p class="lv-value text-lg">₹{{ "%.0f"|format(chart_data[1]) }}</p></div>
+        </div>
+        <div style="height:1px;background:var(--border);"></div>
+        <div>
+            <p class="lv-label mb-3">Spending Progress</p>
+            <div class="progress-track h-2">
+                <div class="progress-fill h-2" style="width:{{ progress_pct }}%;background:{% if progress_pct >= 100 %}var(--red){% elif progress_pct >= 80 %}var(--orange){% else %}var(--accent){% endif %};"></div>
+            </div>
+            <p class="text-xs mt-2" style="color:#aaa">{{ progress_pct|round|int }}% of ₹{{ "%.0f"|format(budget) }} used</p>
+        </div>
+        <div style="height:1px;background:var(--border);"></div>
+        <div>
+            <p class="lv-label mb-3">AI Insight</p>
+            <p class="text-sm leading-relaxed" style="color:var(--text2)">{{ advice }}</p>
+        </div>
+    </div>
+</div>
 
 <!-- ── ADD EXPENSE MODAL ── -->
 <div id="addModal" class="fixed inset-0 z-50 hidden" aria-modal="true">
@@ -706,7 +611,7 @@ new Chart(ctx, {
                                  id="cat-{{ cat }}"
                                  onclick="highlightCat('{{ cat }}')">
                                 <div class="text-2xl mb-1">{{ icon }}</div>
-                                <p class="text-xs font-black" style="color:var(--text)">{{ cat }}</p>
+                                <p class="text-xs font-black" style="color:var(--text)">{% if cat == 'Need' %}Essential{% elif cat == 'Want' %}Desire{% else %}{{ cat }}{% endif %}</p>
                             </div>
                         </label>
                         {% endfor %}

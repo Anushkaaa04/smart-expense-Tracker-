@@ -75,8 +75,8 @@
         <div class="w-28">
             <label class="block text-xs text-faint mb-1">Category</label>
             <select name="category" class="input">
-                <option value="Need">Need</option>
-                <option value="Want">Want</option>
+                <option value="Need">Essential</option>
+                <option value="Want">Desire</option>
             </select>
         </div>
         <button type="submit" class="btn btn-primary">Add</button>
@@ -106,7 +106,7 @@
                 <td class="py-3 px-5 font-semibold" style="color:var(--text)">{{ e.title }}</td>
                 <td class="py-3 px-5">
                     <span class="badge {% if e.category == 'Need' %}badge-blue{% elif e.category == 'Want' %}badge-purple{% else %}badge-green{% endif %}">
-                        {{ e.category }}
+                        {% if e.category == 'Need' %}Essential{% elif e.category == 'Want' %}Desire{% else %}{{ e.category }}{% endif %}
                     </span>
                 </td>
                 <td class="py-3 px-5 text-right font-black" style="color:var(--text)">₹{{ "%.2f"|format(e.amount) }}</td>

@@ -53,7 +53,7 @@
                     <td class="py-4 px-6 font-semibold" style="color:var(--text)">{{ expense.title }}</td>
                     <td class="py-4 px-6">
                         <span class="badge {% if expense.category == 'Need' %}badge-blue{% elif expense.category == 'Want' %}badge-purple{% else %}badge-green{% endif %}">
-                            {{ expense.category }}
+                            {% if expense.category == 'Need' %}Essential{% elif expense.category == 'Want' %}Desire{% else %}{{ expense.category }}{% endif %}
                         </span>
                     </td>
                     <td class="py-4 px-6 text-right font-black" style="color:{% if expense.amount < 0 %}var(--red){% elif expense.category == 'Savings' %}var(--green){% else %}var(--text){% endif %}">
